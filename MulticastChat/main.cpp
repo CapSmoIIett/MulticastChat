@@ -28,42 +28,34 @@ int main()
 	{
 		return -1;
 	}
-	
+
 	int reuseEnable = 1;
-	ret = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, 
-	    (const char*)&reuseEnable, sizeof(reuseEnable));
+	ret = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+		(const char*)&reuseEnable, sizeof(reuseEnable));
 	if (ret < 0)
 	{
 		return -1;
 	}
 
-	
-    SOCKADDR_IN recv_addr;
+
+	SOCKADDR_IN recv_addr;
 	memset(&recv_addr, 0, sizeof(recv_addr));
 	recv_addr.sin_family = AF_INET;
 	recv_addr.sin_port = htons(1900);
 	recv_addr.sin_addr.s_addr = INADDR_ANY;
 
 	int len = sizeof(recv_addr);
-	if (bind(sock, (SOCKADDR*)&recv_addr, sizeof(SOCKADDR_IN)) < 0) 
+	if (bind(sock, (SOCKADDR*)&recv_addr, sizeof(SOCKADDR_IN)) < 0)
 	{
-        recv_addr.sin_port = htons(1901);
+		recv_addr.sin_port = htons(1901);
 		if (bind(sock, (SOCKADDR*)&recv_addr, sizeof(SOCKADDR_IN)) < 0)
 		{
 			printf("ERROR binding in the server socket");
 			return 0;
 		}
 	}
-	
 
-	fd_set fd;
 
-	FD_ZERO(&fd);
-	FD_SET(sock, &fd);
-
-	timeval timeout;
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 10;
 
 	std::vector<std::string> command;
 	std::thread th([&command]()
@@ -78,7 +70,7 @@ int main()
 
 				msg.clear();
 
-                std::cout << ">";
+				std::cout << ">";
 				std::getline(std::cin, msg);
 				std::istringstream iSStream(msg);
 
@@ -94,11 +86,21 @@ int main()
 
 	while (true)
 	{
+
+		fd_set fd;
+
+		FD_ZERO(&fd);
+		FD_SET(sock, &fd);
+
+		timeval timeout;
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 10;
+
 		auto r = select(sock + 1, &fd, nullptr, nullptr, &timeout);
 
-		if (0 < r )
+		if (0 < r)
 		{
-            sockaddr_in addr; 
+			sockaddr_in addr;
 			char buf[215];
 
 			auto addr_len = sizeof(addr);
@@ -110,48 +112,48 @@ int main()
 			continue;
 		if (command[0] == "send")
 		{
-		   if (command.size() > 1 && command[1] == "b")	//broadcast
-		   {
-			   sockaddr_in broadcastAddr; // Make an endpoint
-			   memset(&broadcastAddr, 0, sizeof broadcastAddr);
+			if (command.size() > 1 && command[1] == "b")	//broadcast
+			{
+				sockaddr_in broadcastAddr; // Make an endpoint
+				memset(&broadcastAddr, 0, sizeof broadcastAddr);
 
-			   char* request = "hello";
+				char* request = "hello";
 
-			   broadcastAddr.sin_port = htons(1900); // Set port 1900
-			   broadcastAddr.sin_family = AF_INET;
-			   broadcastAddr.sin_addr = CalculateBroadcastAddr(GetLocalIp(), GetMask());// INADDR_ANY;
-			   //inet_pton(AF_INET, "239.255.255.250", &broadcastAddr.sin_addr); // Set the broadcast IP address
+				broadcastAddr.sin_port = htons(1900); // Set port 1900
+				broadcastAddr.sin_family = AF_INET;
+				broadcastAddr.sin_addr = CalculateBroadcastAddr(GetLocalIp(), GetMask());// INADDR_ANY;
+				//inet_pton(AF_INET, "239.255.255.250", &broadcastAddr.sin_addr); // Set the broadcast IP address
 
-			   // Send the broadcast request, ie "Any upnp devices out there?"
-			   //char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
-			   auto nResult = sendto(sock, request, strlen(request), 0, (struct sockaddr*)&broadcastAddr, sizeof broadcastAddr);
+				// Send the broadcast request, ie "Any upnp devices out there?"
+				//char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
+				auto nResult = sendto(sock, request, strlen(request), 0, (struct sockaddr*)&broadcastAddr, sizeof broadcastAddr);
 
-			   if (nResult == SOCKET_ERROR)
-			   {
-				   //DBG(
-					   printf("ERROR: %d\n", WSAGetLastError());
-				   //)
-                   WSACleanup();
-			   }
-		   }
+				if (nResult == SOCKET_ERROR)
+				{
+					//DBG(
+					printf("ERROR: %d\n", WSAGetLastError());
+					//)
+					WSACleanup();
+				}
+			}
 		}
 		if (command[0] == "params")
 		{
 			std::cout << "IPv4 Address. . : " << GetLocalIp() << "\n";
 			std::cout << "Subnet Mask . . : " << GetMask() << "\n";
 			std::cout << "Broadcast . . . : " << CalculateBroadcast(GetLocalIp(), GetMask()) << "\n";
-		    
+
 		}
 		if (command[0] == "adaptparams")
 		{
 			_GetAdapterInfo();
 		}
-	    if (command[0] == "quit" && command[0] == "q")
+		if (command[0] == "quit" && command[0] == "q")
 		{
 			break;
 		}
 
-        std::cout << "\n";
+		std::cout << "\n";
 
 		command.clear();
 	}
