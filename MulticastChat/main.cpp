@@ -47,12 +47,8 @@ int main()
 	int len = sizeof(recv_addr);
 	if (bind(sock, (SOCKADDR*)&recv_addr, sizeof(SOCKADDR_IN)) < 0)
 	{
-		recv_addr.sin_port = htons(1901);
-		if (bind(sock, (SOCKADDR*)&recv_addr, sizeof(SOCKADDR_IN)) < 0)
-		{
-			printf("ERROR binding in the server socket");
-			return 0;
-		}
+		printf("ERROR binding in the server socket");
+		return 0;
 	}
 
 
@@ -112,7 +108,7 @@ int main()
 			continue;
 		if (command[0] == "send")
 		{
-			if (command.size() > 1 && command[1] == "b")	//broadcast
+			if (command.size() > 1 && command[1] == "b")	// broadcast
 			{
 				sockaddr_in broadcastAddr; // Make an endpoint
 				memset(&broadcastAddr, 0, sizeof broadcastAddr);
@@ -135,6 +131,27 @@ int main()
 					//)
 					WSACleanup();
 				}
+			}
+			if (command.size() > 1 && command[1] == "g")	// multicast
+			{
+				struct sockaddr_in addr;
+				memset(&addr, 0, sizeof(addr));
+				addr.sin_family = AF_INET;
+				addr.sin_addr.s_addr = inet_addr("239.255.255.250");
+				addr.sin_port = htons(1900);
+			}
+		}
+		if (command[0] == "add")
+		{
+			ip_mreq mreq;
+			mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+			mreq.imr_multiaddr.s_addr = inet_addr("239.255.255.250");
+
+			ret = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+				(const char*)&mreq, sizeof(mreq));
+			if (ret < 0)
+			{
+				return -1;
 			}
 		}
 		if (command[0] == "params")
