@@ -12,12 +12,14 @@
 #include <algorithm>
 
 #include <thread>
+#include <mutex>
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <winsock.h>
 #include <IPTypes.h>
 #include <Iphlpapi.h>
+
 
 #pragma comment(lib, "IPHLPAPI.lib")
 

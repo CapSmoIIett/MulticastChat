@@ -5,6 +5,10 @@
 
 #include "header.h"
 
+/*
+ * https://www.ibm.com/docs/en/i/7.1?topic=designs-examples-using-multicasting-af-inet
+ */
+
 
 using namespace std;
 
@@ -15,14 +19,22 @@ int main()
 		return 255;
 	}
 
-	int sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (sock <= 0)
+	int br_sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (br_sock <= 0)
 	{
 		return -1;
 	}
 
+	int mul_sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (mul_sock <= 0)
+	{
+		return -1;
+	}
+
+
+
 	int broadcastEnable = 1;
-	int ret = setsockopt(sock, SOL_SOCKET, SO_BROADCAST,
+	int ret = setsockopt(br_sock , SOL_SOCKET, SO_BROADCAST,
 		(const char*)&broadcastEnable, sizeof(broadcastEnable));
 	if (ret < 0)
 	{
@@ -30,22 +42,54 @@ int main()
 	}
 
 	int reuseEnable = 1;
-	ret = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+	ret = setsockopt(mul_sock , SOL_SOCKET, SO_REUSEADDR,
 		(const char*)&reuseEnable, sizeof(reuseEnable));
 	if (ret < 0)
 	{
 		return -1;
 	}
 
+	/*
+    int loopBack = 1;	// sending system does not receive a copy of the multicast datagrams it transmits
+	ret = setsockopt(mul_sock , SOL_SOCKET, IP_MULTICAST_LOOP,
+		(const char*)&loopBack, sizeof(loopBack));
+	if (ret < 0)
+	{
+		return -1;
+	}
 
-	SOCKADDR_IN recv_addr;
-	memset(&recv_addr, 0, sizeof(recv_addr));
-	recv_addr.sin_family = AF_INET;
-	recv_addr.sin_port = htons(1900);
-	recv_addr.sin_addr.s_addr = INADDR_ANY;
+	int multicastIf = 1;	// which defines the local interface over which the multicast datagrams are sent.
+	ret = setsockopt(mul_sock , SOL_SOCKET, IP_MULTICAST_IF,
+		(const char*)&multicastIf, sizeof(multicastIf));
+	if (ret < 0)
+	{
+		return -1;
+	}
+	*/
 
-	int len = sizeof(recv_addr);
-	if (bind(sock, (SOCKADDR*)&recv_addr, sizeof(SOCKADDR_IN)) < 0)
+
+
+	SOCKADDR_IN br_addr;
+	memset(&br_addr, 0, sizeof(br_addr));
+	br_addr.sin_family = AF_INET;
+	br_addr.sin_addr.s_addr = INADDR_ANY;
+	br_addr.sin_port = htons(1900);
+
+	int len = sizeof(br_addr);
+	if (bind(br_sock , (SOCKADDR*)&br_addr, sizeof(SOCKADDR_IN)) < 0)
+	{
+		printf("ERROR binding in the server socket");
+		return 0;
+	}
+
+	struct sockaddr_in mul_addr;
+	memset(&mul_addr, 0, sizeof(mul_addr));
+	mul_addr.sin_family = AF_INET;
+	mul_addr.sin_addr.s_addr = htonl(INADDR_ANY); // differs from sender
+	mul_addr.sin_port = htons(1901);
+
+	len = sizeof(mul_addr);
+	if (bind(mul_sock , (SOCKADDR*)&mul_addr, sizeof(SOCKADDR_IN)) < 0)
 	{
 		printf("ERROR binding in the server socket");
 		return 0;
@@ -61,7 +105,7 @@ int main()
 				if (!command.empty())
 					continue;
 
-				std::string msg;
+    				std::string msg;
 				std::string word;
 
 				msg.clear();
@@ -84,15 +128,19 @@ int main()
 	{
 
 		fd_set fd;
+		fd_set fd2;
 
 		FD_ZERO(&fd);
-		FD_SET(sock, &fd);
+		FD_ZERO(&fd2);
+		FD_SET(br_sock , &fd);
+		FD_SET(mul_sock , &fd2);
 
 		timeval timeout;
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 10;
 
-		auto r = select(sock + 1, &fd, nullptr, nullptr, &timeout);
+		auto r = select(br_sock + 1, &fd, nullptr, nullptr, &timeout);
+		auto r2 = select(mul_sock + 1, &fd2, nullptr, nullptr, &timeout);
 
 		if (0 < r)
 		{
@@ -100,12 +148,27 @@ int main()
 			char buf[215];
 
 			auto addr_len = sizeof(addr);
-			recvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr*)&addr, (socklen_t*)&addr_len);
+			recvfrom(br_sock , buf, sizeof(buf), 0, (struct sockaddr*)&addr, (socklen_t*)&addr_len);
 			std::cout << buf;
 		}
 
+		if (0 < r2)
+		{
+			sockaddr_in addr;
+			char buf[215];
+
+			auto addr_len = sizeof(addr);
+			recvfrom(mul_sock , buf, sizeof(buf), 0, (struct sockaddr*)&addr, (socklen_t*)&addr_len);
+			std::cout << buf;
+		}
+
+		//cmd_mutex.lock();
 		if (command.empty())
+		{
+            //cmd_mutex.unlock();
 			continue;
+		}
+
 		if (command[0] == "send")
 		{
 			if (command.size() > 1 && command[1] == "b")	// broadcast
@@ -122,7 +185,7 @@ int main()
 
 				// Send the broadcast request, ie "Any upnp devices out there?"
 				//char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
-				auto nResult = sendto(sock, request, strlen(request), 0, (struct sockaddr*)&broadcastAddr, sizeof broadcastAddr);
+				auto nResult = sendto(br_sock , request, strlen(request), 0, (struct sockaddr*)&broadcastAddr, sizeof broadcastAddr);
 
 				if (nResult == SOCKET_ERROR)
 				{
@@ -138,7 +201,20 @@ int main()
 				memset(&addr, 0, sizeof(addr));
 				addr.sin_family = AF_INET;
 				addr.sin_addr.s_addr = inet_addr("239.255.255.250");
-				addr.sin_port = htons(1900);
+				addr.sin_port = htons(1901);
+
+				char* request = "hello";
+
+				auto nResult = sendto(mul_sock , request, sizeof(request), 0, (struct sockaddr*)&addr, sizeof(addr));
+
+				if (nResult == SOCKET_ERROR)
+				{
+					//DBG(
+					printf("ERROR: %d\n", WSAGetLastError());
+					//)
+					WSACleanup();
+				}
+
 			}
 		}
 		if (command[0] == "add")
@@ -147,12 +223,13 @@ int main()
 			mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 			mreq.imr_multiaddr.s_addr = inet_addr("239.255.255.250");
 
-			ret = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+			ret = setsockopt(br_sock , IPPROTO_IP, IP_ADD_MEMBERSHIP,
 				(const char*)&mreq, sizeof(mreq));
 			if (ret < 0)
 			{
 				return -1;
 			}
+
 		}
 		if (command[0] == "params")
 		{
@@ -164,6 +241,7 @@ int main()
 		if (command[0] == "adaptparams")
 		{
 			_GetAdapterInfo();
+
 		}
 		if (command[0] == "quit" && command[0] == "q")
 		{
@@ -172,10 +250,16 @@ int main()
 
 		std::cout << "\n";
 
+        //cmd_mutex.unlock();
 		command.clear();
+		Sleep(10);
 	}
 
 	th.join();
+
+	closesocket(br_sock);
+	closesocket(mul_sock);
+
 	WSACleanup();
 
 	std::cout << "Hello CMake." << endl;
