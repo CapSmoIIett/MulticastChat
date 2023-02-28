@@ -9,6 +9,10 @@
  * https://www.ibm.com/docs/en/i/7.1?topic=designs-examples-using-multicasting-af-inet
  */
 
+#define PORT1 2000
+#define PORT2 1900
+
+#define MULTICAST_IP "239.255.255.250"
 
 using namespace std;
 
@@ -73,7 +77,7 @@ int main()
 	memset(&br_addr, 0, sizeof(br_addr));
 	br_addr.sin_family = AF_INET;
 	br_addr.sin_addr.s_addr = INADDR_ANY;
-	br_addr.sin_port = htons(1900);
+	br_addr.sin_port = htons(PORT1);
 
 	int len = sizeof(br_addr);
 	if (bind(br_sock , (SOCKADDR*)&br_addr, sizeof(SOCKADDR_IN)) < 0)
@@ -86,7 +90,7 @@ int main()
 	memset(&mul_addr, 0, sizeof(mul_addr));
 	mul_addr.sin_family = AF_INET;
 	mul_addr.sin_addr.s_addr = htonl(INADDR_ANY); // differs from sender
-	mul_addr.sin_port = htons(1901);
+	mul_addr.sin_port = htons(PORT2);
 
 	len = sizeof(mul_addr);
 	if (bind(mul_sock , (SOCKADDR*)&mul_addr, sizeof(SOCKADDR_IN)) < 0)
@@ -176,15 +180,15 @@ int main()
 				sockaddr_in broadcastAddr; // Make an endpoint
 				memset(&broadcastAddr, 0, sizeof broadcastAddr);
 
-				char* request = "hello";
+			//	char* request = "hello";
 
-				broadcastAddr.sin_port = htons(1900); // Set port 1900
+				broadcastAddr.sin_port = htons(PORT1); // Set port 1900
 				broadcastAddr.sin_family = AF_INET;
 				broadcastAddr.sin_addr = CalculateBroadcastAddr(GetLocalIp(), GetMask());// INADDR_ANY;
 				//inet_pton(AF_INET, "239.255.255.250", &broadcastAddr.sin_addr); // Set the broadcast IP address
 
 				// Send the broadcast request, ie "Any upnp devices out there?"
-				//char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
+				char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
 				auto nResult = sendto(br_sock , request, strlen(request), 0, (struct sockaddr*)&broadcastAddr, sizeof broadcastAddr);
 
 				if (nResult == SOCKET_ERROR)
@@ -200,8 +204,9 @@ int main()
 				struct sockaddr_in addr;
 				memset(&addr, 0, sizeof(addr));
 				addr.sin_family = AF_INET;
-				addr.sin_addr.s_addr = inet_addr("239.255.255.250");
-				addr.sin_port = htons(1901);
+				//addr.sin_addr.s_addr = inet_addr("239.255.255.250");
+				addr.sin_addr.s_addr = inet_addr(MULTICAST_IP);
+				addr.sin_port = htons(PORT2);
 
 				char* request = "hello";
 
@@ -221,7 +226,7 @@ int main()
 		{
 			ip_mreq mreq;
 			mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-			mreq.imr_multiaddr.s_addr = inet_addr("239.255.255.250");
+			mreq.imr_multiaddr.s_addr = inet_addr(MULTICAST_IP);
 
 			ret = setsockopt(br_sock , IPPROTO_IP, IP_ADD_MEMBERSHIP,
 				(const char*)&mreq, sizeof(mreq));
