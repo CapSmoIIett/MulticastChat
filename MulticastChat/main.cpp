@@ -10,9 +10,9 @@
  */
 
 #define PORT1 2000
-#define PORT2 1900
+#define PORT2 1999
 
-#define MULTICAST_IP "239.255.255.250"
+#define MULTICAST_IP "230.255.255.250"
 
 using namespace std;
 
@@ -180,7 +180,7 @@ int main()
 				sockaddr_in broadcastAddr; // Make an endpoint
 				memset(&broadcastAddr, 0, sizeof broadcastAddr);
 
-			//	char* request = "hello";
+				char* request = "hello";
 
 				broadcastAddr.sin_port = htons(PORT1); // Set port 1900
 				broadcastAddr.sin_family = AF_INET;
@@ -188,7 +188,7 @@ int main()
 				//inet_pton(AF_INET, "239.255.255.250", &broadcastAddr.sin_addr); // Set the broadcast IP address
 
 				// Send the broadcast request, ie "Any upnp devices out there?"
-				char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
+				//char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
 				auto nResult = sendto(br_sock , request, strlen(request), 0, (struct sockaddr*)&broadcastAddr, sizeof broadcastAddr);
 
 				if (nResult == SOCKET_ERROR)
@@ -209,6 +209,7 @@ int main()
 				addr.sin_port = htons(PORT2);
 
 				char* request = "hello";
+				//char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
 
 				auto nResult = sendto(mul_sock , request, sizeof(request), 0, (struct sockaddr*)&addr, sizeof(addr));
 
@@ -228,7 +229,7 @@ int main()
 			mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 			mreq.imr_multiaddr.s_addr = inet_addr(MULTICAST_IP);
 
-			ret = setsockopt(br_sock , IPPROTO_IP, IP_ADD_MEMBERSHIP,
+			ret = setsockopt(mul_sock , IPPROTO_IP, IP_ADD_MEMBERSHIP,
 				(const char*)&mreq, sizeof(mreq));
 			if (ret < 0)
 			{
