@@ -12,7 +12,7 @@
 #define PORT1 2000
 #define PORT2 1999
 
-#define MULTICAST_IP "230.255.255.250"
+#define MULTICAST_IP "224.0.0.222"
 
 using namespace std;
 
@@ -53,6 +53,14 @@ int main()
 		return -1;
 	}
 
+	/*int ttl = 30;
+	setsockopt(mul_sock, IPPROTO_IP, IP_MULTICAST_TTL, (const char*)&ttl, sizeof(ttl));
+	if (ret < 0)
+	{
+		return -1;
+	}
+
+
 	/*
     int loopBack = 1;	// sending system does not receive a copy of the multicast datagrams it transmits
 	ret = setsockopt(mul_sock , SOL_SOCKET, IP_MULTICAST_LOOP,
@@ -62,14 +70,21 @@ int main()
 		return -1;
 	}
 
-	int multicastIf = 1;	// which defines the local interface over which the multicast datagrams are sent.
-	ret = setsockopt(mul_sock , SOL_SOCKET, IP_MULTICAST_IF,
-		(const char*)&multicastIf, sizeof(multicastIf));
-	if (ret < 0)
 	{
-		return -1;
+		struct sockaddr_in mul_addr;
+		memset(&mul_addr, 0, sizeof(mul_addr));
+		mul_addr.sin_family = AF_INET;
+		mul_addr.sin_addr.s_addr = htonl(INADDR_ANY); // differs from sender
+
+		int multicastIf = 1;	// which defines the local interface over which the multicast datagrams are sent.
+		ret = setsockopt(mul_sock, SOL_SOCKET, IP_MULTICAST_IF,
+			(const char*)&mul_addr, sizeof(mul_addr));
+		if (ret < 0)
+		{
+			return -1;
+		}
 	}
-	*/
+	//*/
 
 
 
@@ -211,14 +226,17 @@ int main()
 				char* request = "hello";
 				//char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
 
-				auto nResult = sendto(mul_sock , request, sizeof(request), 0, (struct sockaddr*)&addr, sizeof(addr));
-
-				if (nResult == SOCKET_ERROR)
+				for (int i = 0; i < 1000; i++)
 				{
-					//DBG(
-					printf("ERROR: %d\n", WSAGetLastError());
-					//)
-					WSACleanup();
+					auto nResult = sendto(mul_sock, request, sizeof(request), 0, (struct sockaddr*)&addr, sizeof(addr));
+
+					if (nResult == SOCKET_ERROR)
+					{
+						//DBG(
+						printf("ERROR: %d\n", WSAGetLastError());
+						//)
+						WSACleanup();
+					}
 				}
 
 			}
