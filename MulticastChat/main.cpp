@@ -12,7 +12,7 @@
 #define PORT1 2000
 #define PORT2 1999
 
-#define MULTICAST_IP "224.0.0.222"
+#define MULTICAST_IP "224.255.255.222"
 
 using namespace std;
 
@@ -223,10 +223,10 @@ int main()
 				addr.sin_addr.s_addr = inet_addr(MULTICAST_IP);
 				addr.sin_port = htons(PORT2);
 
-				char* request = "hello";
+				char* request = "hellomMMMMMMMhello";
 				//char* request = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:1\r\n\r\n";
 
-				for (int i = 0; i < 1000; i++)
+				for (int i = 0; i < 10; i++)
 				{
 					auto nResult = sendto(mul_sock, request, sizeof(request), 0, (struct sockaddr*)&addr, sizeof(addr));
 
